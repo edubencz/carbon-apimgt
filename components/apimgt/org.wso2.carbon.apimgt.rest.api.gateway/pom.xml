@@ -145,6 +145,20 @@
 
     <build>
         <plugins>
+            <!-- On Windows, swagger-codegen writes duplicate impl stubs into a mangled path
+                 (org/wso2/carbon/apimgt/rest/api/impl/gateway) alongside the real impl classes under
+                 org/wso2/carbon/apimgt/rest/api/gateway/impl. Excluding that path from compilation
+                 keeps the build working on Windows and is a no-op on platforms where codegen does
+                 not exhibit this behavior. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>org/wso2/carbon/apimgt/rest/api/impl/**</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
             <plugin>
                 <artifactId>maven-clean-plugin</artifactId>
                 <configuration>
