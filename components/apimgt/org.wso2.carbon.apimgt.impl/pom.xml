@@ -12,7 +12,7 @@
     <parent>
         <groupId>org.wso2.carbon.apimgt</groupId>
         <artifactId>apimgt</artifactId>
-        <version>9.33.176</version>
+        <version>9.33.177-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -97,6 +97,14 @@
         <dependency>
             <groupId>org.wso2.carbon.apimgt</groupId>
             <artifactId>org.wso2.carbon.apimgt.api</artifactId>
+        </dependency>
+        <!-- APIAdminImpl uses com.jayway.jsonpath.* directly; declared explicitly at compile scope since
+             org.wso2.carbon.apimgt.api's own json-path dependency is test-scoped in some local build
+             environments and therefore does not propagate transitively. Not an upstream change to commit. -->
+        <dependency>
+            <groupId>org.wso2.orbit.com.jayway.jsonpath</groupId>
+            <artifactId>json-path</artifactId>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.wso2.carbon.apimgt</groupId>
