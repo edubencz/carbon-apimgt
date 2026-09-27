@@ -23,6 +23,7 @@ import org.junit.Test;
 import org.testng.Assert;
 import org.wso2.carbon.apimgt.api.APIManagementException;
 import org.wso2.carbon.apimgt.api.model.Environment;
+import org.wso2.carbon.apimgt.impl.dto.OperationPolicySandboxConfig;
 import org.wso2.carbon.apimgt.impl.dto.PlatformGatewayConnectConfig;
 
 import javax.xml.stream.XMLStreamException;
@@ -91,6 +92,104 @@ public class APIManagerConfigurationTest {
         Environment defaultEnv = environmentsList.get("Default");
         Assert.assertEquals(defaultEnv.getProvider(), "wso2");
         Assert.assertTrue(defaultEnv.getAdditionalProperties().isEmpty());
+    }
+
+    @Test
+    public void testEnvironmentsConfigWithSandboxUrl() throws XMLStreamException, APIManagementException {
+        String envConfig = "<Environment type=\"hybrid\" api-console=\"true\" isDefault=\"true\">\n" +
+                "                <Name>Default</Name>\n" +
+                "                <DisplayName></DisplayName>\n" +
+                "                <GatewayType>Regular</GatewayType>\n" +
+                "                <Description>desc</Description>\n" +
+                "                <ServerURL>https://localhost:9443/services/</ServerURL>\n" +
+                "                <SandboxURL>https://localhost:9444/api/am/gateway/v2</SandboxURL>\n" +
+                "                <Username>${admin.username}</Username>\n" +
+                "                <Password>${admin.password}</Password>\n" +
+                "                <Provider>wso2</Provider>\n" +
+                "                <GatewayEndpoint>https://localhost:9440,http://localhost:9440</GatewayEndpoint>\n" +
+                "                <GatewayWSEndpoint>ws://localhost:9099,wss://localhost:8099</GatewayWSEndpoint>\n" +
+                "                <GatewayWebSubEndpoint>http://localhost:9021,https://localhost:8021</GatewayWebSubEndpoint>\n" +
+                "                <VirtualHosts>\n" +
+                "                </VirtualHosts>\n" +
+                "            </Environment>";
+        OMElement element = AXIOMUtil.stringToOM(envConfig);
+        APIManagerConfiguration config = new APIManagerConfiguration();
+        config.setEnvironmentConfig(element);
+        Environment defaultEnv = config.getGatewayEnvironments().get("Default");
+        Assert.assertEquals(defaultEnv.getSandboxURL(), "https://localhost:9444/api/am/gateway/v2");
+    }
+
+    @Test
+    public void testEnvironmentsConfigWithoutSandboxUrl() throws XMLStreamException, APIManagementException {
+        String envConfig = "<Environment type=\"hybrid\" api-console=\"true\" isDefault=\"true\">\n" +
+                "                <Name>Default</Name>\n" +
+                "                <DisplayName></DisplayName>\n" +
+                "                <GatewayType>Regular</GatewayType>\n" +
+                "                <Description>desc</Description>\n" +
+                "                <ServerURL>https://localhost:9443/services/</ServerURL>\n" +
+                "                <Username>${admin.username}</Username>\n" +
+                "                <Password>${admin.password}</Password>\n" +
+                "                <Provider>wso2</Provider>\n" +
+                "                <GatewayEndpoint>https://localhost:9440,http://localhost:9440</GatewayEndpoint>\n" +
+                "                <GatewayWSEndpoint>ws://localhost:9099,wss://localhost:8099</GatewayWSEndpoint>\n" +
+                "                <GatewayWebSubEndpoint>http://localhost:9021,https://localhost:8021</GatewayWebSubEndpoint>\n" +
+                "                <VirtualHosts>\n" +
+                "                </VirtualHosts>\n" +
+                "            </Environment>";
+        OMElement element = AXIOMUtil.stringToOM(envConfig);
+        APIManagerConfiguration config = new APIManagerConfiguration();
+        config.setEnvironmentConfig(element);
+        Environment defaultEnv = config.getGatewayEnvironments().get("Default");
+        Assert.assertNull(defaultEnv.getSandboxURL());
+    }
+
+    @Test
+    public void testOperationPolicySandboxConfigDefaults() {
+        APIManagerConfiguration config = new APIManagerConfiguration();
+        OperationPolicySandboxConfig sandboxConfig = config.getOperationPolicySandboxConfig();
+        Assert.assertNotNull(sandboxConfig);
+        Assert.assertFalse(sandboxConfig.isEnabled());
+        Assert.assertEquals(sandboxConfig.getTimeout(), 30000);
+        Assert.assertEquals(sandboxConfig.getExecutionTimeout(), 20000);
+        Assert.assertEquals(sandboxConfig.getMaxConcurrentRuns(), 4);
+        Assert.assertEquals(sandboxConfig.getMaxLogLines(), 500);
+    }
+
+    @Test
+    public void testOperationPolicySandboxConfigParsed() throws XMLStreamException {
+        String sandboxConfigXml = "<OperationPolicySandbox>\n" +
+                "        <Enabled>true</Enabled>\n" +
+                "        <Timeout>15000</Timeout>\n" +
+                "        <ExecutionTimeout>9000</ExecutionTimeout>\n" +
+                "        <MaxConcurrentRuns>7</MaxConcurrentRuns>\n" +
+                "        <MaxLogLines>250</MaxLogLines>\n" +
+                "      </OperationPolicySandbox>";
+        OMElement element = AXIOMUtil.stringToOM(sandboxConfigXml);
+        APIManagerConfiguration config = new APIManagerConfiguration();
+        config.setOperationPolicySandboxConfig(element);
+        OperationPolicySandboxConfig sandboxConfig = config.getOperationPolicySandboxConfig();
+        Assert.assertTrue(sandboxConfig.isEnabled());
+        Assert.assertEquals(sandboxConfig.getTimeout(), 15000);
+        Assert.assertEquals(sandboxConfig.getExecutionTimeout(), 9000);
+        Assert.assertEquals(sandboxConfig.getMaxConcurrentRuns(), 7);
+        Assert.assertEquals(sandboxConfig.getMaxLogLines(), 250);
+    }
+
+    @Test
+    public void testOperationPolicySandboxConfigPartial() throws XMLStreamException {
+        // Missing elements keep their defaults.
+        String sandboxConfigXml = "<OperationPolicySandbox>\n" +
+                "        <Enabled>true</Enabled>\n" +
+                "      </OperationPolicySandbox>";
+        OMElement element = AXIOMUtil.stringToOM(sandboxConfigXml);
+        APIManagerConfiguration config = new APIManagerConfiguration();
+        config.setOperationPolicySandboxConfig(element);
+        OperationPolicySandboxConfig sandboxConfig = config.getOperationPolicySandboxConfig();
+        Assert.assertTrue(sandboxConfig.isEnabled());
+        Assert.assertEquals(sandboxConfig.getTimeout(), 30000);
+        Assert.assertEquals(sandboxConfig.getExecutionTimeout(), 20000);
+        Assert.assertEquals(sandboxConfig.getMaxConcurrentRuns(), 4);
+        Assert.assertEquals(sandboxConfig.getMaxLogLines(), 500);
     }
 
     @Test

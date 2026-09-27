@@ -1876,6 +1876,22 @@ public final class APIConstants {
     public static final String MEDIATION_CONFIG = "Mediation";
     public static final String ENABLE_SECURE_XML_PROCESSING = "EnableSecureXMLProcessing";
 
+    // Operation Policy Sandbox (test/execute) Configuration
+    public static final String OPERATION_POLICY_SANDBOX_CONFIG = "OperationPolicySandbox";
+    public static final String OPERATION_POLICY_SANDBOX_ENABLED = "Enabled";
+    public static final String OPERATION_POLICY_SANDBOX_TIMEOUT = "Timeout";
+    public static final String OPERATION_POLICY_SANDBOX_EXECUTION_TIMEOUT = "ExecutionTimeout";
+    public static final String OPERATION_POLICY_SANDBOX_MAX_CONCURRENT_RUNS = "MaxConcurrentRuns";
+    public static final String OPERATION_POLICY_SANDBOX_MAX_LOG_LINES = "MaxLogLines";
+    public static final boolean OPERATION_POLICY_SANDBOX_ENABLED_DEFAULT = false;
+    public static final int OPERATION_POLICY_SANDBOX_TIMEOUT_DEFAULT = 30000;
+    public static final int OPERATION_POLICY_SANDBOX_EXECUTION_TIMEOUT_DEFAULT = 20000;
+    public static final int OPERATION_POLICY_SANDBOX_MAX_CONCURRENT_RUNS_DEFAULT = 4;
+    public static final int OPERATION_POLICY_SANDBOX_MAX_LOG_LINES_DEFAULT = 500;
+
+    // Environment sandbox URL (base URL of the gateway REST v2 used for the policy sandbox)
+    public static final String API_GATEWAY_SANDBOX_URL = "SandboxURL";
+
     // Primary/Secondary Login configuration
     public static final String USERID_LOGIN = "UserIdLogin";
     public static final String EMAIL_LOGIN = "EmailLogin";

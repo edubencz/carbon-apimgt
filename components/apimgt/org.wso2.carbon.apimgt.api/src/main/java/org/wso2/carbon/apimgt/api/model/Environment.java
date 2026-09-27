@@ -38,6 +38,9 @@ public class Environment implements Serializable {
     private static final long serialVersionUID = 1L;
     private String type = APIConstants.GATEWAY_ENV_TYPE_HYBRID;
     private String serverURL;
+    // Base URL of the gateway REST v2 API used for the operation policy sandbox ("test/execute").
+    // Optional: when absent, callers derive it from serverURL (trailing "/services/" -> "/api/am/gateway/v2").
+    private String sandboxURL;
     private String userName;
     private String password;
     private String apiGatewayEndpoint;
@@ -68,6 +71,7 @@ public class Environment implements Serializable {
     public Environment(Environment environment) {
         this.type = environment.type;
         this.serverURL = environment.serverURL;
+        this.sandboxURL = environment.sandboxURL;
         this.userName = environment.userName;
         this.password = environment.password;
         this.apiGatewayEndpoint = environment.apiGatewayEndpoint;
@@ -140,6 +144,14 @@ public class Environment implements Serializable {
 
     public void setServerURL(String serverURL) {
         this.serverURL = serverURL;
+    }
+
+    public String getSandboxURL() {
+        return sandboxURL;
+    }
+
+    public void setSandboxURL(String sandboxURL) {
+        this.sandboxURL = sandboxURL;
     }
 
     public String getUserName() {

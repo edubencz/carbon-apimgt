@@ -157,6 +157,11 @@
                 <Description>{{environment_name.description}}</Description>
                 <!-- Server URL of the API gateway -->
                 <ServerURL>{{environment_name.service_url}}</ServerURL>
+                <!-- Optional base URL of the gateway REST v2 API used by the operation policy sandbox
+                     ("test/execute"). When absent, it is derived from ServerURL. -->
+                {% if environment_name.sandbox_url is defined %}
+                <SandboxURL>{{environment_name.sandbox_url}}</SandboxURL>
+                {% endif %}
                 <!-- Admin username for the API gateway. -->
                 <Username>{{environment_name.username}}</Username>
                 <!-- Admin password for the API gateway.-->
@@ -2239,6 +2244,13 @@
       <Mediation>
         <EnableSecureXMLProcessing>{{apim.mediation.enable_secure_xml_processing}}</EnableSecureXMLProcessing>
       </Mediation>
+      <OperationPolicySandbox>
+        <Enabled>{{apim.policy_sandbox.enable}}</Enabled>
+        <Timeout>{{apim.policy_sandbox.timeout}}</Timeout>
+        <ExecutionTimeout>{{apim.policy_sandbox.execution_timeout}}</ExecutionTimeout>
+        <MaxConcurrentRuns>{{apim.policy_sandbox.max_concurrent_runs}}</MaxConcurrentRuns>
+        <MaxLogLines>{{apim.policy_sandbox.max_log_lines}}</MaxLogLines>
+      </OperationPolicySandbox>
       {% if server.network_security.access_control is defined %}
             <NetworkSecurityAccessControl>
               <Enabled>true</Enabled>

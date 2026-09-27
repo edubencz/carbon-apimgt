@@ -58,6 +58,7 @@ import org.wso2.carbon.apimgt.impl.dto.ExtendedJWTConfigurationDto;
 import org.wso2.carbon.apimgt.impl.dto.GatewayArtifactSynchronizerProperties;
 import org.wso2.carbon.apimgt.impl.dto.GatewayCleanupSkipList;
 import org.wso2.carbon.apimgt.impl.dto.LoadingTenants;
+import org.wso2.carbon.apimgt.impl.dto.OperationPolicySandboxConfig;
 import org.wso2.carbon.apimgt.impl.dto.OrgAccessControl;
 import org.wso2.carbon.apimgt.impl.dto.RedisConfig;
 import org.wso2.carbon.apimgt.impl.dto.TenantSharingConfigurationDTO;
@@ -167,6 +168,7 @@ public class APIManagerConfiguration {
     private GatewayCleanupSkipList gatewayCleanupSkipList = new GatewayCleanupSkipList();
     private RedisConfig redisConfig = new RedisConfig();
     private SolaceConfig solaceConfig = new SolaceConfig();
+    private OperationPolicySandboxConfig operationPolicySandboxConfig = new OperationPolicySandboxConfig();
     private OrgAccessControl orgAccessControl = new OrgAccessControl();
     public OrgAccessControl getOrgAccessControl() {
         return orgAccessControl;
@@ -725,6 +727,8 @@ public class APIManagerConfiguration {
                     String key = getKey(nameStack) + "." + APIConstants.ENABLE_SECURE_XML_PROCESSING;
                     addToConfiguration(key, enableSecureXMLProcessingElement.getText());
                 }
+            } else if (APIConstants.OPERATION_POLICY_SANDBOX_CONFIG.equals(localName)) {
+                setOperationPolicySandboxConfig(element);
             } else if (elementHasText(element)) {
                 String key = getKey(nameStack);
                 String value = MiscellaneousUtil.resolve(element, secretResolver);
@@ -1108,6 +1112,55 @@ public class APIManagerConfiguration {
         }
     }
 
+    /**
+     * Parses the {@code <OperationPolicySandbox>} block used by the operation policy "test/execute" (sandbox)
+     * feature. Any missing child element keeps the default value from {@link OperationPolicySandboxConfig}.
+     *
+     * @param element the {@code <OperationPolicySandbox>} element.
+     */
+    void setOperationPolicySandboxConfig(OMElement element) {
+
+        OperationPolicySandboxConfig config = new OperationPolicySandboxConfig();
+        OMElement enabledElement = element.getFirstChildWithName(
+                new QName(APIConstants.OPERATION_POLICY_SANDBOX_ENABLED));
+        if (enabledElement != null && StringUtils.isNotBlank(enabledElement.getText())) {
+            config.setEnabled(Boolean.parseBoolean(enabledElement.getText().trim()));
+        }
+        OMElement timeoutElement = element.getFirstChildWithName(
+                new QName(APIConstants.OPERATION_POLICY_SANDBOX_TIMEOUT));
+        if (timeoutElement != null && StringUtils.isNumeric(timeoutElement.getText().trim())) {
+            config.setTimeout(Integer.parseInt(timeoutElement.getText().trim()));
+        }
+        OMElement executionTimeoutElement = element.getFirstChildWithName(
+                new QName(APIConstants.OPERATION_POLICY_SANDBOX_EXECUTION_TIMEOUT));
+        if (executionTimeoutElement != null && StringUtils.isNumeric(executionTimeoutElement.getText().trim())) {
+            config.setExecutionTimeout(Integer.parseInt(executionTimeoutElement.getText().trim()));
+        }
+        OMElement maxConcurrentRunsElement = element.getFirstChildWithName(
+                new QName(APIConstants.OPERATION_POLICY_SANDBOX_MAX_CONCURRENT_RUNS));
+        if (maxConcurrentRunsElement != null && StringUtils.isNumeric(maxConcurrentRunsElement.getText().trim())) {
+            config.setMaxConcurrentRuns(Integer.parseInt(maxConcurrentRunsElement.getText().trim()));
+        }
+        OMElement maxLogLinesElement = element.getFirstChildWithName(
+                new QName(APIConstants.OPERATION_POLICY_SANDBOX_MAX_LOG_LINES));
+        if (maxLogLinesElement != null && StringUtils.isNumeric(maxLogLinesElement.getText().trim())) {
+            config.setMaxLogLines(Integer.parseInt(maxLogLinesElement.getText().trim()));
+        }
+        operationPolicySandboxConfig = config;
+    }
+
+    /**
+     * Returns the Control Plane configuration for the operation policy sandbox ("Testar agora") feature.
+     * Never {@code null}; defaults are used for any element missing from api-manager.xml, and the feature
+     * is disabled by default.
+     *
+     * @return the parsed {@link OperationPolicySandboxConfig}.
+     */
+    public OperationPolicySandboxConfig getOperationPolicySandboxConfig() {
+
+        return operationPolicySandboxConfig;
+    }
+
     private void setOrgBasedAccessControlConfigs(OMElement element) {
         OMElement orgEnableElement =
                 element.getFirstChildWithName(new QName(APIConstants.ORG_BASED_ACCESS_CONTROL_ENABLE));
@@ -1227,6 +1280,11 @@ public class APIManagerConfiguration {
         if (StringUtils.isEmpty(environment.getDisplayName())) {environment.setDisplayName(environment.getName());}
         environment.setServerURL(APIUtil.replaceSystemProperty(environmentElem.getFirstChildWithName(new QName(
                         APIConstants.API_GATEWAY_SERVER_URL)).getText()));
+        OMElement sandboxUrlElement =
+                environmentElem.getFirstChildWithName(new QName(APIConstants.API_GATEWAY_SANDBOX_URL));
+        if (sandboxUrlElement != null && StringUtils.isNotBlank(sandboxUrlElement.getText())) {
+            environment.setSandboxURL(APIUtil.replaceSystemProperty(sandboxUrlElement.getText().trim()));
+        }
         environment.setUserName(APIUtil.replaceSystemProperty(environmentElem.getFirstChildWithName(new QName(
                         APIConstants.API_GATEWAY_USERNAME)).getText()));
         OMElement passwordElement = environmentElem.getFirstChildWithName(new QName(APIConstants.API_GATEWAY_PASSWORD));
