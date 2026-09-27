@@ -113,6 +113,7 @@ public class SettingsMappingUtil {
                     config.getDesignAssistantConfigurationDto().isKeyProvided());
             settingsDTO.setIsMCPSupportEnabled(config.isMCPSupportEnabled());
             settingsDTO.setIsGatewayNotificationEnabled(APIUtil.isGatewayNotificationEnabled());
+            settingsDTO.setOperationPolicyTestEnabled(config.getOperationPolicySandboxConfig().isEnabled());
         }
         return settingsDTO;
     }

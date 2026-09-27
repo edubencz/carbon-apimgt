@@ -4,6 +4,9 @@ import org.wso2.carbon.apimgt.rest.api.publisher.v1.dto.ErrorDTO;
 import java.io.File;
 import org.wso2.carbon.apimgt.rest.api.publisher.v1.dto.OperationPolicyDataDTO;
 import org.wso2.carbon.apimgt.rest.api.publisher.v1.dto.OperationPolicyDataListDTO;
+import org.wso2.carbon.apimgt.rest.api.publisher.v1.dto.OperationPolicyRenderResponseDTO;
+import org.wso2.carbon.apimgt.rest.api.publisher.v1.dto.OperationPolicySandboxEnvironmentListDTO;
+import org.wso2.carbon.apimgt.rest.api.publisher.v1.dto.OperationPolicyTestResponseDTO;
 import org.wso2.carbon.apimgt.rest.api.publisher.v1.OperationPoliciesApiService;
 import org.wso2.carbon.apimgt.rest.api.publisher.v1.impl.OperationPoliciesApiServiceImpl;
 import org.wso2.carbon.apimgt.api.APIManagementException;
@@ -152,6 +155,41 @@ OperationPoliciesApiService delegate = new OperationPoliciesApiServiceImpl();
         return delegate.getCommonOperationPolicyContentByPolicyId(operationPolicyId, securityContext);
     }
 
+    @GET
+    @Path("/{operationPolicyId}/definition")
+    
+    @Produces({ "text/plain", "application/json" })
+    @ApiOperation(value = "Get the raw policy definition of a common operation policy", notes = "Returns the raw (unrendered) gateway policy definition text (e.g. the Synapse `.j2` mediation DSL) for a common operation policy, used by the Publisher's \"Duplicate in editor\" action. ", response = String.class, authorizations = {
+        @Authorization(value = "OAuth2Security", scopes = {
+            @AuthorizationScope(scope = "apim:common_operation_policy_view", description = "View common operation policies"),
+            @AuthorizationScope(scope = "apim:common_operation_policy_manage", description = "Add, Update and Delete common operation policies"),
+            @AuthorizationScope(scope = "apim:mediation_policy_create", description = "Create mediation policies")
+        })
+    }, tags={ "Operation Policies",  })
+    @ApiResponses(value = { 
+        @ApiResponse(code = 200, message = "OK. The raw policy definition. ", response = String.class),
+        @ApiResponse(code = 404, message = "Not Found. The specified resource does not exist.", response = ErrorDTO.class),
+        @ApiResponse(code = 500, message = "Internal Server Error.", response = ErrorDTO.class) })
+    public Response getCommonOperationPolicyDefinition(@ApiParam(value = "Operation policy Id ",required=true) @PathParam("operationPolicyId") String operationPolicyId,  @ApiParam(value = "Gateway type of the policy definition to retrieve.")  @QueryParam("gatewayType") String gatewayType) throws APIManagementException{
+        return delegate.getCommonOperationPolicyDefinition(operationPolicyId, gatewayType, securityContext);
+    }
+
+    @GET
+    @Path("/test/environments")
+    
+    @Produces({ "application/json" })
+    @ApiOperation(value = "List the gateway environments available for the operation policy sandbox", notes = "Lists only the config-defined gateway environments (from api-manager.xml / deployment.toml) that have a server URL or a sandbox URL. Environments created only through the Admin portal are not config-defined and are therefore not listed. ", response = OperationPolicySandboxEnvironmentListDTO.class, authorizations = {
+        @Authorization(value = "OAuth2Security", scopes = {
+            @AuthorizationScope(scope = "apim:common_operation_policy_manage", description = "Add, Update and Delete common operation policies"),
+            @AuthorizationScope(scope = "apim:common_operation_policy_create", description = "Create common operation policies")
+        })
+    }, tags={ "Operation Policies",  })
+    @ApiResponses(value = { 
+        @ApiResponse(code = 200, message = "OK. ", response = OperationPolicySandboxEnvironmentListDTO.class) })
+    public Response getOperationPolicySandboxEnvironments() throws APIManagementException{
+        return delegate.getOperationPolicySandboxEnvironments(securityContext);
+    }
+
     @POST
     @Path("/import")
     @Consumes({ "multipart/form-data" })
@@ -160,7 +198,7 @@ OperationPoliciesApiService delegate = new OperationPoliciesApiServiceImpl();
         @Authorization(value = "OAuth2Security", scopes = {
             @AuthorizationScope(scope = "apim:policies_import_export", description = "Export and import policies related operations")
         })
-    }, tags={ "Import Export" })
+    }, tags={ "Import Export",  })
     @ApiResponses(value = { 
         @ApiResponse(code = 200, message = "Created. Policy Imported Successfully. ", response = Void.class),
         @ApiResponse(code = 403, message = "Forbidden. The request must be conditional but no condition has been specified.", response = ErrorDTO.class),
@@ -168,5 +206,41 @@ OperationPoliciesApiService delegate = new OperationPoliciesApiServiceImpl();
         @ApiResponse(code = 500, message = "Internal Server Error.", response = ErrorDTO.class) })
     public Response importOperationPolicy( @Multipart(value = "file") InputStream fileInputStream, @Multipart(value = "file" ) Attachment fileDetail) throws APIManagementException{
         return delegate.importOperationPolicy(fileInputStream, fileDetail, securityContext);
+    }
+
+    @POST
+    @Path("/render")
+    @Consumes({ "application/json" })
+    @Produces({ "application/json" })
+    @ApiOperation(value = "Render and validate a Synapse operation policy", notes = "", response = OperationPolicyRenderResponseDTO.class, authorizations = {
+        @Authorization(value = "OAuth2Security", scopes = {
+            @AuthorizationScope(scope = "apim:common_operation_policy_manage", description = "Add, Update and Delete common operation policies")
+        })
+    }, tags={ "Operation Policies",  })
+    @ApiResponses(value = { 
+        @ApiResponse(code = 200, message = "Rendered and validated policy", response = OperationPolicyRenderResponseDTO.class),
+        @ApiResponse(code = 400, message = "Bad Request. Invalid request or validation error.", response = ErrorDTO.class) })
+    public Response renderOperationPolicy(@ApiParam(value = "" ,required=true) String body) throws APIManagementException{
+        return delegate.renderOperationPolicy(body, securityContext);
+    }
+
+    @POST
+    @Path("/test")
+    @Consumes({ "application/json" })
+    @Produces({ "application/json" })
+    @ApiOperation(value = "Render and execute a Synapse operation policy on a gateway sandbox", notes = "Renders the given policy definition. If rendering succeeds, the rendered sequence is forwarded to the policy sandbox endpoint of the selected gateway environment for execution. If rendering fails, the render fields are returned with no `execution`, and the gateway is not contacted. Requires the operation policy sandbox to be enabled on this Control Plane (the `<OperationPolicySandbox>` block of api-manager.xml). ", response = OperationPolicyTestResponseDTO.class, authorizations = {
+        @Authorization(value = "OAuth2Security", scopes = {
+            @AuthorizationScope(scope = "apim:common_operation_policy_manage", description = "Add, Update and Delete common operation policies"),
+            @AuthorizationScope(scope = "apim:common_operation_policy_create", description = "Create common operation policies")
+        })
+    }, tags={ "Operation Policies" })
+    @ApiResponses(value = { 
+        @ApiResponse(code = 200, message = "OK. The policy was rendered, and executed on the selected gateway sandbox unless there were render errors. ", response = OperationPolicyTestResponseDTO.class),
+        @ApiResponse(code = 400, message = "Bad Request. Invalid request or validation error.", response = ErrorDTO.class),
+        @ApiResponse(code = 404, message = "Not Found. The operation policy sandbox is disabled on this Control Plane, or the selected gateway environment does not exist / has no server or sandbox URL configured. ", response = ErrorDTO.class),
+        @ApiResponse(code = 429, message = "Too Many Requests. The gateway rejected the run: too many concurrent sandbox runs. ", response = ErrorDTO.class),
+        @ApiResponse(code = 502, message = "Bad Gateway. The selected gateway environment could not be reached. ", response = ErrorDTO.class) })
+    public Response testOperationPolicy(@ApiParam(value = "" ,required=true) String body) throws APIManagementException{
+        return delegate.testOperationPolicy(body, securityContext);
     }
 }

@@ -11849,6 +11849,46 @@ paths:
           source: 'curl -k -H "Authorization: Bearer ae4eae22-3f65-387b-a171-d37eaa366fa8"
           "https://127.0.0.1:9443/api/am/publisher/v4/apis/96077508-fd01-4fae-bc64-5de0e2baf43c/operation-policies/f56eb8b4-128c-45aa-ad35-9c87a546261a/content"'
 
+  /apis/{apiId}/operation-policies/{operationPolicyId}/definition:
+    get:
+      tags:
+        - API Operation Policies
+      summary: Get the raw policy definition of an API specific operation policy
+      description: |
+        Returns the raw (unrendered) gateway policy definition text (e.g. the Synapse `.j2` mediation
+        DSL) for an API specific operation policy, used by the Publisher's "Duplicate in editor" action.
+      operationId: getAPISpecificOperationPolicyDefinition
+      parameters:
+        - $ref: '#/components/parameters/apiId'
+        - $ref: '#/components/parameters/operationPolicyId'
+        - name: gatewayType
+          in: query
+          description: Gateway type of the policy definition to retrieve.
+          schema:
+            type: string
+      responses:
+        200:
+          description: |
+            OK.
+            The raw policy definition.
+          content:
+            text/plain:
+              schema:
+                type: string
+        404:
+          $ref: '#/components/responses/NotFound'
+        500:
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - OAuth2Security:
+            - apim:api_view
+            - apim:api_manage
+            - apim:mediation_policy_view
+            - apim:mediation_policy_create
+            - apim:mediation_policy_manage
+            - apim:api_mediation_policy_manage
+            - apim:api_create
+
   ######################################################
   # The "API Endpoint Collection" resource APIs
   ######################################################
@@ -12864,6 +12904,149 @@ paths:
             -H "Content-Type: multipart/form-data" -F policySpecFile=@setHeader.yaml -F synapsePolicyDefinitionFile=@setHeader.j2
             "https://127.0.0.1:9443/api/am/publisher/v4/operation-policies"'
 
+  /operation-policies/render:
+    post:
+      tags:
+        - Operation Policies
+      summary: Render and validate a Synapse operation policy
+      operationId: renderOperationPolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        200:
+          description: Rendered and validated policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationPolicyRenderResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+      security:
+        - OAuth2Security:
+            - apim:common_operation_policy_manage
+
+  /operation-policies/test:
+    post:
+      tags:
+        - Operation Policies
+      summary: Render and execute a Synapse operation policy on a gateway sandbox
+      description: |
+        Renders the given policy definition. If rendering succeeds, the rendered sequence is
+        forwarded to the policy sandbox endpoint of the selected gateway environment for execution.
+        If rendering fails, the render fields are returned with no `execution`, and the gateway is
+        not contacted. Requires the operation policy sandbox to be enabled on this Control Plane
+        (the `<OperationPolicySandbox>` block of api-manager.xml).
+      operationId: testOperationPolicy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        200:
+          description: |
+            OK.
+            The policy was rendered, and executed on the selected gateway sandbox unless there were
+            render errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationPolicyTestResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        404:
+          description: |
+            Not Found.
+            The operation policy sandbox is disabled on this Control Plane, or the selected gateway
+            environment does not exist / has no server or sandbox URL configured.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        429:
+          description: |
+            Too Many Requests.
+            The gateway rejected the run: too many concurrent sandbox runs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        502:
+          description: |
+            Bad Gateway.
+            The selected gateway environment could not be reached.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - OAuth2Security:
+            - apim:common_operation_policy_manage
+            - apim:common_operation_policy_create
+
+  /operation-policies/test/environments:
+    get:
+      tags:
+        - Operation Policies
+      summary: List the gateway environments available for the operation policy sandbox
+      description: |
+        Lists only the config-defined gateway environments (from api-manager.xml / deployment.toml)
+        that have a server URL or a sandbox URL. Environments created only through the Admin portal
+        are not config-defined and are therefore not listed.
+      operationId: getOperationPolicySandboxEnvironments
+      responses:
+        200:
+          description: |
+            OK.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationPolicySandboxEnvironmentList'
+      security:
+        - OAuth2Security:
+            - apim:common_operation_policy_manage
+            - apim:common_operation_policy_create
+
+  /operation-policies/{operationPolicyId}/definition:
+    get:
+      tags:
+        - Operation Policies
+      summary: Get the raw policy definition of a common operation policy
+      description: |
+        Returns the raw (unrendered) gateway policy definition text (e.g. the Synapse `.j2` mediation
+        DSL) for a common operation policy, used by the Publisher's "Duplicate in editor" action.
+      operationId: getCommonOperationPolicyDefinition
+      parameters:
+        - $ref: '#/components/parameters/operationPolicyId'
+        - name: gatewayType
+          in: query
+          description: Gateway type of the policy definition to retrieve.
+          schema:
+            type: string
+      responses:
+        200:
+          description: |
+            OK.
+            The raw policy definition.
+          content:
+            text/plain:
+              schema:
+                type: string
+        404:
+          $ref: '#/components/responses/NotFound'
+        500:
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - OAuth2Security:
+            - apim:common_operation_policy_view
+            - apim:common_operation_policy_manage
+            - apim:mediation_policy_create
+
   /operation-policies/export:
     get:
       tags:
@@ -13697,6 +13880,83 @@ paths:
 
 components:
   schemas:
+    OperationPolicyRenderError:
+      type: object
+      properties:
+        line:
+          type: integer
+        column:
+          type: integer
+        message:
+          type: string
+        severity:
+          type: string
+    OperationPolicyRenderResponse:
+      type: object
+      properties:
+        renderedSequence:
+          type: string
+        normalized:
+          type: boolean
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/OperationPolicyRenderError'
+        warnings:
+          type: array
+          items:
+            type: string
+        detectedVariables:
+          type: array
+          items:
+            type: string
+        unknownMediators:
+          type: array
+          items:
+            type: string
+    OperationPolicyTestResponse:
+      type: object
+      properties:
+        renderedSequence:
+          type: string
+        normalized:
+          type: boolean
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/OperationPolicyRenderError'
+        warnings:
+          type: array
+          items:
+            type: string
+        detectedVariables:
+          type: array
+          items:
+            type: string
+        unknownMediators:
+          type: array
+          items:
+            type: string
+        execution:
+          type: object
+          description: The gateway's PolicySandboxExecuteResponse, passed through verbatim.
+          additionalProperties: true
+    OperationPolicySandboxEnvironment:
+      type: object
+      properties:
+        name:
+          type: string
+        displayName:
+          type: string
+    OperationPolicySandboxEnvironmentList:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        environments:
+          type: array
+          items:
+            $ref: '#/components/schemas/OperationPolicySandboxEnvironment'
     ContentPublishStatus:
       type: object
       properties:
@@ -18535,6 +18795,14 @@ components:
           type: boolean
           description: |
             Is Cross Tenant Subscriptions Enabled
+          example: false
+          default: false
+        operationPolicyTestEnabled:
+          type: boolean
+          description: |
+            Whether the operation policy sandbox ("test/execute") feature is enabled on this
+            Control Plane. Backed by the `<OperationPolicySandbox>/<Enabled>` element of
+            api-manager.xml (`[apim.policy_sandbox] enable` in deployment.toml).
           example: false
           default: false
         defaultAdvancePolicy:

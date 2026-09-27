@@ -18,6 +18,12 @@
 
 package org.wso2.carbon.apimgt.rest.api.publisher.v1.impl;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.reflect.TypeToken;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
@@ -28,19 +34,25 @@ import org.wso2.carbon.apimgt.api.APIManagementException;
 import org.wso2.carbon.apimgt.api.APIMgtResourceNotFoundException;
 import org.wso2.carbon.apimgt.api.APIProvider;
 import org.wso2.carbon.apimgt.api.ExceptionCodes;
+import org.wso2.carbon.apimgt.api.model.Environment;
 import org.wso2.carbon.apimgt.api.model.OperationPolicyData;
 import org.wso2.carbon.apimgt.api.model.OperationPolicyDefinition;
 import org.wso2.carbon.apimgt.api.model.OperationPolicySpecification;
 import org.wso2.carbon.apimgt.impl.APIConstants;
+import org.wso2.carbon.apimgt.impl.APIManagerConfiguration;
 import org.wso2.carbon.apimgt.impl.importexport.ExportFormat;
 import org.wso2.carbon.apimgt.impl.importexport.ImportExportConstants;
 import org.wso2.carbon.apimgt.impl.importexport.utils.CommonUtil;
+import org.wso2.carbon.apimgt.impl.internal.ServiceReferenceHolder;
+import org.wso2.carbon.apimgt.impl.policy.sandbox.GatewaySandboxClient;
+import org.wso2.carbon.apimgt.impl.policy.sandbox.GatewaySandboxException;
 import org.wso2.carbon.apimgt.impl.restapi.publisher.OperationPoliciesApiServiceImplUtils;
 import org.wso2.carbon.apimgt.impl.utils.APIUtil;
 import org.wso2.carbon.apimgt.rest.api.common.RestApiCommonUtil;
 import org.wso2.carbon.apimgt.rest.api.common.RestApiConstants;
 import org.wso2.carbon.apimgt.rest.api.publisher.v1.OperationPoliciesApiService;
 import org.wso2.carbon.apimgt.rest.api.publisher.v1.common.mappings.ImportUtils;
+import org.wso2.carbon.apimgt.rest.api.publisher.v1.common.OperationPolicyRenderer;
 import org.wso2.carbon.apimgt.rest.api.publisher.v1.common.mappings.OperationPolicyMappingUtil;
 import org.wso2.carbon.apimgt.rest.api.publisher.v1.dto.OperationPolicyDataDTO;
 import org.wso2.carbon.apimgt.rest.api.publisher.v1.dto.OperationPolicyDataListDTO;
@@ -61,6 +73,225 @@ import javax.ws.rs.core.Response;
 public class OperationPoliciesApiServiceImpl implements OperationPoliciesApiService {
 
     private static final Log log = LogFactory.getLog(OperationPoliciesApiServiceImpl.class);
+    private static final Gson GSON = new Gson();
+
+    @Override
+    public Response renderOperationPolicy(String requestBody, MessageContext messageContext) {
+        try {
+            JsonObject request = JsonParser.parseString(requestBody).getAsJsonObject();
+            JsonElement definition = request.get("policyDefinition");
+            if (definition == null || !definition.isJsonPrimitive() || !definition.getAsJsonPrimitive().isString()) {
+                return Response.status(Response.Status.BAD_REQUEST).type("application/json")
+                        .entity("{\"message\":\"policyDefinition must be a string\"}").build();
+            }
+            Map<String, Object> values = new HashMap<>();
+            JsonElement attributes = request.get("attributeValues");
+            if (attributes != null && !attributes.isJsonNull()) {
+                if (!attributes.isJsonObject()) {
+                    return Response.status(Response.Status.BAD_REQUEST).type("application/json")
+                            .entity("{\"message\":\"attributeValues must be an object\"}").build();
+                }
+                values = GSON.fromJson(attributes, new TypeToken<Map<String, Object>>() { }.getType());
+            }
+            OperationPolicyRenderer.RenderOutput output =
+                    new OperationPolicyRenderer().render(definition.getAsString(), values);
+            return Response.ok(GSON.toJson(output), "application/json").build();
+        } catch (RuntimeException e) {
+            log.debug("Invalid operation policy render request", e);
+            return Response.status(Response.Status.BAD_REQUEST).type("application/json")
+                    .entity("{\"message\":\"Invalid JSON request\"}").build();
+        }
+    }
+
+    /**
+     * Renders a policy and, if the render has no errors, executes it on a gateway environment's policy
+     * sandbox. See {@code dev-scripts/sandbox-contract.md} for the exact request/response contract.
+     */
+    @Override
+    public Response testOperationPolicy(String requestBody, MessageContext messageContext) {
+        APIManagerConfiguration config = ServiceReferenceHolder.getInstance()
+                .getAPIManagerConfigurationService().getAPIManagerConfiguration();
+        if (!config.getOperationPolicySandboxConfig().isEnabled()) {
+            return jsonError(Response.Status.NOT_FOUND, "Policy sandbox is disabled");
+        }
+        try {
+            JsonObject request = JsonParser.parseString(requestBody).getAsJsonObject();
+            JsonElement definitionElement = request.get("policyDefinition");
+            if (definitionElement == null || !definitionElement.isJsonPrimitive()
+                    || !definitionElement.getAsJsonPrimitive().isString()) {
+                return Response.status(Response.Status.BAD_REQUEST).type("application/json")
+                        .entity("{\"message\":\"policyDefinition must be a string\"}").build();
+            }
+            JsonElement environmentElement = request.get("gatewayEnvironment");
+            if (environmentElement == null || !environmentElement.isJsonPrimitive()
+                    || StringUtils.isBlank(environmentElement.getAsString())) {
+                return Response.status(Response.Status.BAD_REQUEST).type("application/json")
+                        .entity("{\"message\":\"gatewayEnvironment is required\"}").build();
+            }
+            Map<String, Object> values = new HashMap<>();
+            JsonElement attributes = request.get("attributeValues");
+            if (attributes != null && !attributes.isJsonNull()) {
+                if (!attributes.isJsonObject()) {
+                    return Response.status(Response.Status.BAD_REQUEST).type("application/json")
+                            .entity("{\"message\":\"attributeValues must be an object\"}").build();
+                }
+                values = GSON.fromJson(attributes, new TypeToken<Map<String, Object>>() { }.getType());
+            }
+
+            OperationPolicyRenderer.RenderOutput renderOutput =
+                    new OperationPolicyRenderer().render(definitionElement.getAsString(), values);
+            JsonObject responseJson = GSON.toJsonTree(renderOutput).getAsJsonObject();
+            if (!renderOutput.errors.isEmpty()) {
+                // Render errors short-circuit the flow: the gateway is never contacted.
+                return Response.ok(GSON.toJson(responseJson), "application/json").build();
+            }
+
+            JsonObject gatewayRequest = new JsonObject();
+            String sequenceXml = "<sequence xmlns=\"http://ws.apache.org/ns/synapse\">"
+                    + renderOutput.renderedSequence + "</sequence>";
+            gatewayRequest.addProperty("renderedSequence", sequenceXml);
+            gatewayRequest.addProperty("flow", request.has("flow") && !request.get("flow").isJsonNull()
+                    ? request.get("flow").getAsString() : "request");
+            if (request.has("sampleRequest") && request.get("sampleRequest").isJsonObject()) {
+                gatewayRequest.add("sampleRequest", request.get("sampleRequest"));
+            }
+            if (request.has("mocks") && request.get("mocks").isJsonArray()) {
+                gatewayRequest.add("mocks", request.get("mocks"));
+            }
+            if (request.has("extraProperties") && request.get("extraProperties").isJsonObject()) {
+                gatewayRequest.add("extraProperties", request.get("extraProperties"));
+            }
+            gatewayRequest.addProperty("captureSnapshots", request.has("captureSnapshots")
+                    && !request.get("captureSnapshots").isJsonNull() && request.get("captureSnapshots").getAsBoolean());
+
+            try {
+                JsonObject execution = new GatewaySandboxClient()
+                        .execute(environmentElement.getAsString(), GSON.toJson(gatewayRequest));
+                responseJson.add("execution", execution);
+                return Response.ok(GSON.toJson(responseJson), "application/json").build();
+            } catch (GatewaySandboxException e) {
+                log.warn("Policy sandbox execution failed on gateway environment '"
+                        + environmentElement.getAsString() + "': " + e.getMessage());
+                return mapGatewaySandboxException(e);
+            }
+        } catch (RuntimeException e) {
+            log.debug("Invalid operation policy test request", e);
+            return Response.status(Response.Status.BAD_REQUEST).type("application/json")
+                    .entity("{\"message\":\"Invalid JSON request\"}").build();
+        }
+    }
+
+    /**
+     * Lists the config-defined gateway environments that can be used as a policy sandbox target.
+     */
+    @Override
+    public Response getOperationPolicySandboxEnvironments(MessageContext messageContext) {
+        APIManagerConfiguration config = ServiceReferenceHolder.getInstance()
+                .getAPIManagerConfigurationService().getAPIManagerConfiguration();
+        boolean enabled = config.getOperationPolicySandboxConfig().isEnabled();
+
+        JsonObject response = new JsonObject();
+        response.addProperty("enabled", enabled);
+        JsonArray environments = new JsonArray();
+        for (Environment environment : new GatewaySandboxClient().getSandboxCapableEnvironments().values()) {
+            JsonObject environmentJson = new JsonObject();
+            environmentJson.addProperty("name", environment.getName());
+            environmentJson.addProperty("displayName", environment.getDisplayName());
+            environments.add(environmentJson);
+        }
+        response.add("environments", environments);
+        return Response.ok(GSON.toJson(response), "application/json").build();
+    }
+
+    /**
+     * Returns the raw (unrendered) gateway policy definition text of a common operation policy, used by
+     * the Publisher's "Duplicate in editor" action.
+     */
+    @Override
+    public Response getCommonOperationPolicyDefinition(String operationPolicyId, String gatewayType,
+                                                        MessageContext messageContext) {
+        try {
+            APIProvider apiProvider = RestApiCommonUtil.getLoggedInUserProvider();
+            String organization = RestApiUtil.getValidatedOrganization(messageContext);
+
+            OperationPolicyData policyData =
+                    apiProvider.getCommonOperationPolicyByPolicyId(operationPolicyId, organization, true);
+            if (policyData == null) {
+                throw new APIMgtResourceNotFoundException("Couldn't retrieve an existing common policy with ID: "
+                        + operationPolicyId, ExceptionCodes.from(ExceptionCodes.OPERATION_POLICY_NOT_FOUND,
+                        operationPolicyId));
+            }
+            OperationPolicyDefinition definition = resolvePolicyDefinition(policyData, gatewayType);
+            if (definition == null || StringUtils.isEmpty(definition.getContent())) {
+                throw new APIMgtResourceNotFoundException("No " + resolveGatewayType(gatewayType)
+                        + " definition found for operation policy: " + operationPolicyId,
+                        ExceptionCodes.from(ExceptionCodes.OPERATION_POLICY_NOT_FOUND, operationPolicyId));
+            }
+            return Response.ok(definition.getContent(), "text/plain").build();
+        } catch (APIManagementException e) {
+            if (RestApiUtil.isDueToResourceNotFound(e)) {
+                RestApiUtil.handleResourceNotFoundError(RestApiConstants.RESOURCE_PATH_OPERATION_POLICIES,
+                        operationPolicyId, e, log);
+            } else {
+                String errorMessage = "Error while getting the definition of common operation policy with ID :"
+                        + operationPolicyId + " " + e.getMessage();
+                RestApiUtil.handleInternalServerError(errorMessage, e, log);
+            }
+        } catch (Exception e) {
+            RestApiUtil.handleInternalServerError(
+                    "An error has occurred while getting the definition of the common operation policy with ID "
+                            + operationPolicyId, e, log);
+        }
+        return null;
+    }
+
+    /**
+     * Picks the {@link OperationPolicyDefinition} matching the requested {@code gatewayType} query parameter
+     * (default {@code Synapse}) out of an {@link OperationPolicyData} loaded with definitions.
+     */
+    static OperationPolicyDefinition resolvePolicyDefinition(OperationPolicyData policyData, String gatewayType) {
+        String type = resolveGatewayType(gatewayType);
+        if (OperationPolicyDefinition.GatewayType.ChoreoConnect.name().equalsIgnoreCase(type)) {
+            return policyData.getCcPolicyDefinition();
+        }
+        return policyData.getSynapsePolicyDefinition();
+    }
+
+    private static String resolveGatewayType(String gatewayType) {
+        return StringUtils.isBlank(gatewayType) ? OperationPolicyDefinition.GatewayType.Synapse.name() : gatewayType;
+    }
+
+    private static Response jsonError(Response.Status status, String message) {
+        JsonObject error = new JsonObject();
+        error.addProperty("code", status.getStatusCode());
+        error.addProperty("message", message);
+        return Response.status(status).type("application/json").entity(GSON.toJson(error)).build();
+    }
+
+    private static Response mapGatewaySandboxException(GatewaySandboxException e) {
+        Response.Status status;
+        switch (e.getReason()) {
+            case ENVIRONMENT_NOT_FOUND:
+            case DISABLED:
+                status = Response.Status.NOT_FOUND;
+                break;
+            case TOO_MANY_RUNS:
+                status = Response.Status.TOO_MANY_REQUESTS;
+                break;
+            case PAYLOAD_TOO_LARGE:
+                status = Response.Status.REQUEST_ENTITY_TOO_LARGE;
+                break;
+            case BAD_REQUEST:
+                status = Response.Status.BAD_REQUEST;
+                break;
+            case UNREACHABLE:
+            case GATEWAY_ERROR:
+            default:
+                status = Response.Status.BAD_GATEWAY;
+                break;
+        }
+        return jsonError(status, e.getMessage());
+    }
 
     /**
      * Add a common operation policy that can be used by all the APIs

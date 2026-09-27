@@ -40,6 +40,7 @@ public class SettingsDTO   {
     private Boolean portalConfigurationOnlyModeEnabled = false;
     private Boolean retryCallWithNewOAuthTokenEnabled = true;
     private Boolean crossTenantSubscriptionEnabled = false;
+    private Boolean operationPolicyTestEnabled = false;
     private String defaultAdvancePolicy = null;
     private String defaultSubscriptionPolicy = null;
     private String authorizationHeader = null;
@@ -285,6 +286,24 @@ public class SettingsDTO   {
   }
 
   /**
+   * Whether the operation policy sandbox (\&quot;test/execute\&quot;) feature is enabled on this Control Plane. Backed by the &#x60;&lt;OperationPolicySandbox&gt;/&lt;Enabled&gt;&#x60; element of api-manager.xml (&#x60;[apim.policy_sandbox] enable&#x60; in deployment.toml). 
+   **/
+  public SettingsDTO operationPolicyTestEnabled(Boolean operationPolicyTestEnabled) {
+    this.operationPolicyTestEnabled = operationPolicyTestEnabled;
+    return this;
+  }
+
+  
+  @ApiModelProperty(example = "false", value = "Whether the operation policy sandbox (\"test/execute\") feature is enabled on this Control Plane. Backed by the `<OperationPolicySandbox>/<Enabled>` element of api-manager.xml (`[apim.policy_sandbox] enable` in deployment.toml). ")
+  @JsonProperty("operationPolicyTestEnabled")
+  public Boolean isOperationPolicyTestEnabled() {
+    return operationPolicyTestEnabled;
+  }
+  public void setOperationPolicyTestEnabled(Boolean operationPolicyTestEnabled) {
+    this.operationPolicyTestEnabled = operationPolicyTestEnabled;
+  }
+
+  /**
    * Default Advance Policy.
    **/
   public SettingsDTO defaultAdvancePolicy(String defaultAdvancePolicy) {
@@ -504,6 +523,7 @@ public class SettingsDTO   {
         Objects.equals(portalConfigurationOnlyModeEnabled, settings.portalConfigurationOnlyModeEnabled) &&
         Objects.equals(retryCallWithNewOAuthTokenEnabled, settings.retryCallWithNewOAuthTokenEnabled) &&
         Objects.equals(crossTenantSubscriptionEnabled, settings.crossTenantSubscriptionEnabled) &&
+        Objects.equals(operationPolicyTestEnabled, settings.operationPolicyTestEnabled) &&
         Objects.equals(defaultAdvancePolicy, settings.defaultAdvancePolicy) &&
         Objects.equals(defaultSubscriptionPolicy, settings.defaultSubscriptionPolicy) &&
         Objects.equals(authorizationHeader, settings.authorizationHeader) &&
@@ -519,7 +539,7 @@ public class SettingsDTO   {
 
   @Override
   public int hashCode() {
-    return Objects.hash(devportalUrl, environment, gatewayTypes, gatewayFeatureCatalog, scopes, monetizationAttributes, subscriberContactAttributes, securityAuditProperties, externalStoresEnabled, docVisibilityEnabled, portalConfigurationOnlyModeEnabled, retryCallWithNewOAuthTokenEnabled, crossTenantSubscriptionEnabled, defaultAdvancePolicy, defaultSubscriptionPolicy, authorizationHeader, isJWTEnabledForLoginTokens, orgAccessControlEnabled, allowSubscriptionValidationDisabling, designAssistantEnabled, aiAuthTokenProvided, isGatewayNotificationEnabled, isMCPSupportEnabled, customProperties);
+    return Objects.hash(devportalUrl, environment, gatewayTypes, gatewayFeatureCatalog, scopes, monetizationAttributes, subscriberContactAttributes, securityAuditProperties, externalStoresEnabled, docVisibilityEnabled, portalConfigurationOnlyModeEnabled, retryCallWithNewOAuthTokenEnabled, crossTenantSubscriptionEnabled, operationPolicyTestEnabled, defaultAdvancePolicy, defaultSubscriptionPolicy, authorizationHeader, isJWTEnabledForLoginTokens, orgAccessControlEnabled, allowSubscriptionValidationDisabling, designAssistantEnabled, aiAuthTokenProvided, isGatewayNotificationEnabled, isMCPSupportEnabled, customProperties);
   }
 
   @Override
@@ -540,6 +560,7 @@ public class SettingsDTO   {
     sb.append("    portalConfigurationOnlyModeEnabled: ").append(toIndentedString(portalConfigurationOnlyModeEnabled)).append("\n");
     sb.append("    retryCallWithNewOAuthTokenEnabled: ").append(toIndentedString(retryCallWithNewOAuthTokenEnabled)).append("\n");
     sb.append("    crossTenantSubscriptionEnabled: ").append(toIndentedString(crossTenantSubscriptionEnabled)).append("\n");
+    sb.append("    operationPolicyTestEnabled: ").append(toIndentedString(operationPolicyTestEnabled)).append("\n");
     sb.append("    defaultAdvancePolicy: ").append(toIndentedString(defaultAdvancePolicy)).append("\n");
     sb.append("    defaultSubscriptionPolicy: ").append(toIndentedString(defaultSubscriptionPolicy)).append("\n");
     sb.append("    authorizationHeader: ").append(toIndentedString(authorizationHeader)).append("\n");

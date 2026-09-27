@@ -1271,6 +1271,29 @@ ApisApiService delegate = new ApisApiServiceImpl();
     }
 
     @GET
+    @Path("/{apiId}/operation-policies/{operationPolicyId}/definition")
+    
+    @Produces({ "text/plain", "application/json" })
+    @ApiOperation(value = "Get the raw policy definition of an API specific operation policy", notes = "Returns the raw (unrendered) gateway policy definition text (e.g. the Synapse `.j2` mediation DSL) for an API specific operation policy, used by the Publisher's \"Duplicate in editor\" action. ", response = String.class, authorizations = {
+        @Authorization(value = "OAuth2Security", scopes = {
+            @AuthorizationScope(scope = "apim:api_view", description = "View API"),
+            @AuthorizationScope(scope = "apim:api_manage", description = "Manage all API related operations"),
+            @AuthorizationScope(scope = "apim:mediation_policy_view", description = "View mediation policies"),
+            @AuthorizationScope(scope = "apim:mediation_policy_create", description = "Create mediation policies"),
+            @AuthorizationScope(scope = "apim:mediation_policy_manage", description = "Update and delete mediation policies"),
+            @AuthorizationScope(scope = "apim:api_mediation_policy_manage", description = "View, create, update and remove API specific mediation policies"),
+            @AuthorizationScope(scope = "apim:api_create", description = "Create API")
+        })
+    }, tags={ "API Operation Policies",  })
+    @ApiResponses(value = { 
+        @ApiResponse(code = 200, message = "OK. The raw policy definition. ", response = String.class),
+        @ApiResponse(code = 404, message = "Not Found. The specified resource does not exist.", response = ErrorDTO.class),
+        @ApiResponse(code = 500, message = "Internal Server Error.", response = ErrorDTO.class) })
+    public Response getAPISpecificOperationPolicyDefinition(@ApiParam(value = "**API ID** consisting of the **UUID** of the API. ",required=true) @PathParam("apiId") String apiId, @ApiParam(value = "Operation policy Id ",required=true) @PathParam("operationPolicyId") String operationPolicyId,  @ApiParam(value = "Gateway type of the policy definition to retrieve.")  @QueryParam("gatewayType") String gatewayType) throws APIManagementException{
+        return delegate.getAPISpecificOperationPolicyDefinition(apiId, operationPolicyId, gatewayType, securityContext);
+    }
+
+    @GET
     @Path("/{apiId}/subscription-policies")
     
     @Produces({ "application/json" })

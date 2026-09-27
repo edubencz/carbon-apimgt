@@ -2639,6 +2639,57 @@ public class ApisApiServiceImpl implements ApisApiService {
     }
 
     /**
+     * Returns the raw (unrendered) gateway policy definition text of an API specific operation policy, used
+     * by the Publisher's "Duplicate in editor" action.
+     *
+     * @param apiId             API UUID
+     * @param operationPolicyId UUID of the operation policy
+     * @param gatewayType       gateway type of the definition to retrieve (defaults to Synapse)
+     * @param messageContext    message context
+     * @return the raw policy definition as text/plain
+     */
+    @Override
+    public Response getAPISpecificOperationPolicyDefinition(String apiId, String operationPolicyId,
+                                                             String gatewayType, MessageContext messageContext) {
+        try {
+            APIProvider apiProvider = RestApiCommonUtil.getLoggedInUserProvider();
+            String organization = RestApiUtil.getValidatedOrganization(messageContext);
+
+            CommonUtils.validateAPIExistence(apiId);
+
+            OperationPolicyData policyData =
+                    apiProvider.getAPISpecificOperationPolicyByPolicyId(operationPolicyId, apiId, organization, true);
+            if (policyData == null) {
+                throw new APIMgtResourceNotFoundException("Couldn't retrieve an existing operation policy with ID: "
+                        + operationPolicyId + " for API " + apiId,
+                        ExceptionCodes.from(ExceptionCodes.OPERATION_POLICY_NOT_FOUND, operationPolicyId));
+            }
+            OperationPolicyDefinition definition =
+                    OperationPoliciesApiServiceImpl.resolvePolicyDefinition(policyData, gatewayType);
+            if (definition == null || StringUtils.isEmpty(definition.getContent())) {
+                throw new APIMgtResourceNotFoundException("No policy definition found for operation policy with ID: "
+                        + operationPolicyId + " for API " + apiId,
+                        ExceptionCodes.from(ExceptionCodes.OPERATION_POLICY_NOT_FOUND, operationPolicyId));
+            }
+            return Response.ok(definition.getContent(), "text/plain").build();
+        } catch (APIManagementException e) {
+            if (RestApiUtil.isDueToResourceNotFound(e) || RestApiUtil.isDueToAuthorizationFailure(e)) {
+                RestApiUtil.handleResourceNotFoundError(RestApiConstants.RESOURCE_PATH_OPERATION_POLICIES,
+                        operationPolicyId, e, log);
+            } else {
+                String errorMessage =
+                        "Error while getting the definition of an API specific operation policy with ID :"
+                                + operationPolicyId + " for API " + apiId + " " + e.getMessage();
+                RestApiUtil.handleInternalServerError(errorMessage, e, log);
+            }
+        } catch (Exception e) {
+            RestApiUtil.handleInternalServerError("An Error has occurred while getting the definition of the" +
+                    " operation policy with ID " + operationPolicyId + " for API " + apiId, e, log);
+        }
+        return null;
+    }
+
+    /**
      * Delete API specific operation policy by providing the policy ID
      *
      * @param apiId             API UUID

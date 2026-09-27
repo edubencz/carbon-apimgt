@@ -13,6 +13,9 @@ import org.wso2.carbon.apimgt.rest.api.publisher.v1.dto.ErrorDTO;
 import java.io.File;
 import org.wso2.carbon.apimgt.rest.api.publisher.v1.dto.OperationPolicyDataDTO;
 import org.wso2.carbon.apimgt.rest.api.publisher.v1.dto.OperationPolicyDataListDTO;
+import org.wso2.carbon.apimgt.rest.api.publisher.v1.dto.OperationPolicyRenderResponseDTO;
+import org.wso2.carbon.apimgt.rest.api.publisher.v1.dto.OperationPolicySandboxEnvironmentListDTO;
+import org.wso2.carbon.apimgt.rest.api.publisher.v1.dto.OperationPolicyTestResponseDTO;
 
 import java.util.List;
 
@@ -29,5 +32,9 @@ public interface OperationPoliciesApiService {
       public Response getAllCommonOperationPolicies(Integer limit, Integer offset, String query, MessageContext messageContext) throws APIManagementException;
       public Response getCommonOperationPolicyByPolicyId(String operationPolicyId, MessageContext messageContext) throws APIManagementException;
       public Response getCommonOperationPolicyContentByPolicyId(String operationPolicyId, MessageContext messageContext) throws APIManagementException;
+      public Response getCommonOperationPolicyDefinition(String operationPolicyId, String gatewayType, MessageContext messageContext) throws APIManagementException;
+      public Response getOperationPolicySandboxEnvironments(MessageContext messageContext) throws APIManagementException;
       public Response importOperationPolicy(InputStream fileInputStream, Attachment fileDetail, MessageContext messageContext) throws APIManagementException;
+      public Response renderOperationPolicy(String body, MessageContext messageContext) throws APIManagementException;
+      public Response testOperationPolicy(String body, MessageContext messageContext) throws APIManagementException;
 }
