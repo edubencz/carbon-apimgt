@@ -120,6 +120,60 @@
         } ]
       }
     },
+    "/policy-sandbox/execute" : {
+      "post" : {
+        "summary" : "Execute a rendered operation-policy sequence in the sandbox",
+        "description" : "Deploys the given, already-rendered Synapse mediation sequence as a temporary API, invokes\nit over loopback with the given sample request (optionally rewriting outbound calls to\nper-run mocks), captures trace/logs/final-message state, and undeploys the temporary API -\nalways, even on error. Disabled (404) unless [apim.policy_sandbox] enable=true.\n",
+        "operationId" : "executePolicySandbox",
+        "parameters" : [ {
+          "in" : "body",
+          "name" : "body",
+          "required" : true,
+          "schema" : {
+            "$ref" : "#/definitions/PolicySandboxExecuteRequest"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK. The sandbox run was attempted (see the response `status` for its outcome).\n",
+            "schema" : {
+              "$ref" : "#/definitions/PolicySandboxExecuteResponse"
+            }
+          },
+          "400" : {
+            "description" : "Bad Request. The renderedSequence is not well-formed XML.\n",
+            "schema" : {
+              "$ref" : "#/definitions/Error"
+            }
+          },
+          "404" : {
+            "description" : "Not Found. The policy sandbox is disabled on this Gateway.\n",
+            "schema" : {
+              "$ref" : "#/definitions/Error"
+            }
+          },
+          "413" : {
+            "description" : "Payload Too Large. The sample request body exceeds the configured limit.\n",
+            "schema" : {
+              "$ref" : "#/definitions/Error"
+            }
+          },
+          "429" : {
+            "description" : "Too Many Requests. The configured max_concurrent_runs limit was exceeded.\n",
+            "schema" : {
+              "$ref" : "#/definitions/Error"
+            }
+          }
+        },
+        "security" : [ {
+          "OAuth2Security" : [ ]
+        } ],
+        "x-code-samples" : [ {
+          "lang" : "Curl",
+          "source" : "curl -k -X POST \"https://127.0.0.1:9443/api/am/gateway/v2/policy-sandbox/execute\" -H \"Authorization: Basic YWRtaW46YWRtaW4=\" -H \"Content-Type: application/json\" -d \"{}\""
+        } ]
+      }
+    },
     "/server-startup-healthcheck" : {
       "get" : {
         "summary" : "Health check to check if all the API are deployed during the server startup\n",
@@ -992,6 +1046,295 @@
           "type" : "string"
         }
       }
+    },
+    "PolicySandboxSampleRequest" : {
+      "properties" : {
+        "method" : {
+          "type" : "string",
+          "example" : "POST"
+        },
+        "path" : {
+          "type" : "string",
+          "example" : "/orders/1?x=y"
+        },
+        "headers" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        },
+        "body" : {
+          "type" : "string"
+        },
+        "contentType" : {
+          "type" : "string"
+        }
+      },
+      "title" : "Sample request to drive the sandboxed policy"
+    },
+    "PolicySandboxMock" : {
+      "required" : [ "id", "matchType", "urlPattern" ],
+      "properties" : {
+        "id" : {
+          "type" : "string"
+        },
+        "urlPattern" : {
+          "type" : "string",
+          "description" : "A GLOB or REGEX pattern matched against the rendered endpoint/target URL."
+        },
+        "matchType" : {
+          "type" : "string",
+          "enum" : [ "GLOB", "REGEX" ]
+        },
+        "method" : {
+          "type" : "string",
+          "description" : "Optional; any method matches when absent."
+        },
+        "status" : {
+          "type" : "integer"
+        },
+        "headers" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        },
+        "body" : {
+          "type" : "string"
+        },
+        "contentType" : {
+          "type" : "string"
+        },
+        "delayMs" : {
+          "type" : "integer"
+        }
+      },
+      "title" : "A single URL-pattern mock for outbound calls"
+    },
+    "PolicySandboxExecuteRequest" : {
+      "required" : [ "renderedSequence" ],
+      "properties" : {
+        "renderedSequence" : {
+          "type" : "string",
+          "description" : "Already-rendered (no Jinja), normalized Synapse mediation sequence: a single\n<sequence> root, no name attribute.\n"
+        },
+        "flow" : {
+          "type" : "string",
+          "default" : "request",
+          "enum" : [ "request", "response", "fault" ]
+        },
+        "sampleRequest" : {
+          "$ref" : "#/definitions/PolicySandboxSampleRequest"
+        },
+        "mocks" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/PolicySandboxMock"
+          }
+        },
+        "extraProperties" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        },
+        "captureSnapshots" : {
+          "type" : "boolean",
+          "default" : false
+        }
+      },
+      "title" : "Policy sandbox execute request"
+    },
+    "PolicySandboxClientResponse" : {
+      "properties" : {
+        "status" : {
+          "type" : "integer"
+        },
+        "headers" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        },
+        "body" : {
+          "type" : "string"
+        }
+      }
+    },
+    "PolicySandboxFinalMessage" : {
+      "properties" : {
+        "payload" : {
+          "type" : "string"
+        },
+        "contentType" : {
+          "type" : "string"
+        },
+        "httpStatus" : {
+          "type" : "integer"
+        },
+        "headers" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "PolicySandboxProperties" : {
+      "properties" : {
+        "synapse" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        },
+        "axis2" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        },
+        "transport" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "PolicySandboxLogEntry" : {
+      "properties" : {
+        "ts" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "level" : {
+          "type" : "string"
+        },
+        "nodeId" : {
+          "type" : "string"
+        },
+        "message" : {
+          "type" : "string"
+        }
+      }
+    },
+    "PolicySandboxTraceEntry" : {
+      "properties" : {
+        "order" : {
+          "type" : "integer"
+        },
+        "nodeId" : {
+          "type" : "string"
+        },
+        "tag" : {
+          "type" : "string"
+        },
+        "tMs" : {
+          "type" : "integer",
+          "format" : "int64"
+        }
+      }
+    },
+    "PolicySandboxOutboundCall" : {
+      "properties" : {
+        "nodeId" : {
+          "type" : "string"
+        },
+        "method" : {
+          "type" : "string"
+        },
+        "url" : {
+          "type" : "string"
+        },
+        "mocked" : {
+          "type" : "boolean"
+        },
+        "mockId" : {
+          "type" : "string"
+        },
+        "status" : {
+          "type" : "integer"
+        },
+        "requestBody" : {
+          "type" : "string"
+        },
+        "durationMs" : {
+          "type" : "integer",
+          "format" : "int64"
+        }
+      }
+    },
+    "PolicySandboxFault" : {
+      "properties" : {
+        "code" : {
+          "type" : "string"
+        },
+        "message" : {
+          "type" : "string"
+        },
+        "nodeId" : {
+          "type" : "string"
+        }
+      }
+    },
+    "PolicySandboxExecuteResponse" : {
+      "properties" : {
+        "status" : {
+          "type" : "string",
+          "enum" : [ "COMPLETED", "RESPONDED", "FAULT", "DROPPED", "TIMEOUT", "ERROR" ]
+        },
+        "respondedEarly" : {
+          "type" : "boolean"
+        },
+        "durationMs" : {
+          "type" : "integer",
+          "format" : "int64"
+        },
+        "clientResponse" : {
+          "$ref" : "#/definitions/PolicySandboxClientResponse"
+        },
+        "finalMessage" : {
+          "$ref" : "#/definitions/PolicySandboxFinalMessage"
+        },
+        "properties" : {
+          "$ref" : "#/definitions/PolicySandboxProperties"
+        },
+        "logs" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/PolicySandboxLogEntry"
+          }
+        },
+        "trace" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/PolicySandboxTraceEntry"
+          }
+        },
+        "outboundCalls" : {
+          "type" : "array",
+          "items" : {
+            "$ref" : "#/definitions/PolicySandboxOutboundCall"
+          }
+        },
+        "fault" : {
+          "$ref" : "#/definitions/PolicySandboxFault"
+        },
+        "warnings" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "errors" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        }
+      },
+      "title" : "Policy sandbox execute response"
     }
   },
   "parameters" : {

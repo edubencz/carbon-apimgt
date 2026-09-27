@@ -44,7 +44,8 @@
                 org.wso2.carbon.apimgt.rest.api.gateway.ApisApi,
                 org.wso2.carbon.apimgt.rest.api.gateway.ApplicationsApi,
                 org.wso2.carbon.apimgt.rest.api.gateway.SubscriptionsApi,
-                org.wso2.carbon.apimgt.rest.api.gateway.ServerStartupHealthcheckApi
+                org.wso2.carbon.apimgt.rest.api.gateway.ServerStartupHealthcheckApi,
+                org.wso2.carbon.apimgt.rest.api.gateway.PolicySandboxApi
             </param-value>
         </init-param>
         <init-param>
